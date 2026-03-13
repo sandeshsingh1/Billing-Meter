@@ -1,0 +1,19 @@
+cat > .gitignore << 'EOF'
+# C++ build files
+cpp-engine/build/
+*.o
+*.exe
+
+# Node.js
+backend/node_modules/
+frontend/node_modules/
+
+# Environment variables (passwords hote hain)
+.env
+
+# VSCode settings
+.vscode/
+
+# Logs
+*.log
+EOF
