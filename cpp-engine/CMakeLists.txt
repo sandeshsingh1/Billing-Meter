@@ -18,3 +18,14 @@ target_link_libraries(billing_engine
   Crow::Crow
   nlohmann_json::nlohmann_json
 )
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
+
+add_executable(run_tests
+  tests/test_meter.cpp
+)
+
+target_link_libraries(run_tests
+  ${GTEST_LIBRARIES}
+  pthread
+)

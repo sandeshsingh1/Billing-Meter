@@ -3,7 +3,6 @@ cat > .gitignore << 'EOF'
 cpp-engine/build/
 *.o
 *.exe
-
 # Node.js
 backend/node_modules/
 frontend/node_modules/
