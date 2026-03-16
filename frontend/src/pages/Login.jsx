@@ -4,7 +4,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
-
 export default function Login() {
   // Form state
   const [email,    setEmail]    = useState('')
@@ -19,7 +18,6 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError('')
-
     try {
       const res = await axios.post('http://localhost:5000/api/auth/login', {
         email,
@@ -40,7 +38,6 @@ export default function Login() {
       setLoading(false)
     }
   }
-
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">

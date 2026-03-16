@@ -14,7 +14,6 @@ const User = require('../models/User');
 // ─────────────────────────────────────
 const protect = async (req, res, next) => {
     let token;
-
     // Header mein token hai?
     // Format: "Bearer eyJhbGc..."
     if (req.headers.authorization &&

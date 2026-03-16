@@ -27,23 +27,17 @@ const getCurrentMonth = () => {
 // ─────────────────────────────────────
 router.get('/current', protect, async (req, res) => {
     try {
-        const tenantId = req.user.tenantId;
-
-        // C++ engine se bill lo
+        const tenantId = req.user.tenantId  // ← ye line zaroori hai
+        
         const response = await axios.get(
             `${process.env.CPP_ENGINE_URL}/bill/${tenantId}`
-        );
-
-        res.json({
-            success: true,
-            data:    response.data
-        });
-
+        )
+        // ...
     } catch (error) {
         if (error.response && error.response.status === 404) {
-            // Koi usage nahi — zero bill
+            const tenantId = req.user.tenantId  // ← catch mein bhi chahiye
             return res.json({
-                success:      true,
+                success: true,
                 data: {
                     tenantId,
                     storageCost:   0,
@@ -52,12 +46,11 @@ router.get('/current', protect, async (req, res) => {
                     totalCost:     0,
                     currency:      'USD'
                 }
-            });
+            })
         }
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error.message })
     }
-});
-
+})
 // ─────────────────────────────────────
 // POST /api/billing/generate
 // Invoice generate karo current month ke liye
@@ -111,19 +104,16 @@ router.post('/generate', protect, async (req, res) => {
             currency:      bill.currency,
             status:        'pending'
         });
-
         res.status(201).json({
             success: true,
             message: 'Invoice generated!',
             data:    invoice
         });
-
     } catch (error) {
         console.log('Invoice error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
-
 // ─────────────────────────────────────
 // GET /api/billing/invoices
 // Sari invoices dekho
@@ -145,7 +135,6 @@ router.get('/invoices', protect, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-
 // ─────────────────────────────────────
 // PATCH /api/billing/pay/:invoiceId
 // Invoice mark as paid
