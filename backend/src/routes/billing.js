@@ -24,15 +24,13 @@ const getCurrentMonth = () => {
 // ─────────────────────────────────────
 router.get('/current', protect, async (req, res) => {
     try {
-        const tenantId = req.user.tenantId  // ← ye line zaroori hai
-        
-        const response = await axios.get(
-            `${process.env.CPP_ENGINE_URL}/bill/${tenantId}`
-        )
-        // 
-    } catch (error) {
-        if (error.response && error.response.status === 404) {
-            const tenantId = req.user.tenantId  // ← catch mein bhi chahiye
+        const tenantId = req.user.tenantId;
+
+        // Pehle C++ engine mein usage sync karo
+        const billingMonth = getCurrentMonth();
+        const usage = await Usage.findOne({ tenantId, billingMonth });
+
+        if (!usage) {
             return res.json({
                 success: true,
                 data: {
@@ -43,11 +41,35 @@ router.get('/current', protect, async (req, res) => {
                     totalCost:     0,
                     currency:      'USD'
                 }
-            })
+            });
         }
-        res.status(500).json({ error: error.message })
+
+        // C++ engine mein sync karo
+        try {
+            await axios.post(`${process.env.CPP_ENGINE_URL}/usage`, {
+                tenantId,
+                storageGB:   usage.storageGB,
+                apiCalls:    usage.apiCalls,
+                bandwidthGB: usage.bandwidthGB
+            });
+        } catch (syncErr) {
+            console.log('Sync error:', syncErr.message);
+        }
+
+        // Bill calculate karo
+        const response = await axios.get(
+            `${process.env.CPP_ENGINE_URL}/bill/${tenantId}`
+        );
+
+        res.json({
+            success: true,
+            data:    response.data
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-})
+});
 // ─────────────────────────────────────
 // POST /api/billing/generate
 // Invoice generate karo current month ke liye

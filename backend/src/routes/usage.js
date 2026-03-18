@@ -150,5 +150,43 @@ router.get('/realtime', protect, async (req, res) => {
         }
         res.status(500).json({ error: error.message });
     }
+    });
+
+    // ─────────────────────────────────────
+// POST /api/usage/sync
+// MongoDB se C++ engine mein data load karo
+// Server restart ke baad call karo
+// ─────────────────────────────────────
+router.post('/sync', protect, async (req, res) => {
+    try {
+        const tenantId     = req.user.tenantId;
+        const billingMonth = getCurrentMonth();
+
+        const usage = await Usage.findOne({ tenantId, billingMonth });
+
+        if (!usage) {
+            return res.json({
+                success: true,
+                message: 'Koi data nahi mila sync karne ke liye'
+            });
+        }
+
+        await axios.post(`${process.env.CPP_ENGINE_URL}/usage`, {
+            tenantId,
+            storageGB:   usage.storageGB,
+            apiCalls:    usage.apiCalls,
+            bandwidthGB: usage.bandwidthGB
+        });
+
+        res.json({
+            success: true,
+            message: 'Data synced!',
+            data:    usage
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
+
 module.exports = router;

@@ -2,34 +2,48 @@
 // Dashboard Page
 // Usage charts aur bill dikhata hai
 // ─────────────────────────────────────
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer
-} from 'recharts'
-export default function Dashboard(){
-  const [usage,   setUsage]   = useState(null)
-  const [bill,    setBill]    = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [forecast, setForecast] = useState(null)
-  const navigate  = useNavigate()
-  const token     = localStorage.getItem('token')
-  const name      = localStorage.getItem('name')
-  const tenantId  = localStorage.getItem('tenantId')
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+export default function Dashboard() {
+  const [usage, setUsage] = useState(null);
+  const [bill, setBill] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [forecast, setForecast] = useState(null);
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+  const name = localStorage.getItem("name");
+  const tenantId = localStorage.getItem("tenantId");
 
   // Auth header
   const config = {
-    headers: { Authorization: `Bearer ${token}` }
-  }
+    headers: { Authorization: `Bearer ${token}` },
+  };
 
   // Data fetch karo
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-const fetchData = async () => {
+// ─────────────────────────────────────
+// Auto sync — page load hone pe
+// C++ engine mein data sync karo
+// ─────────────────────────────────────
+const autoSync = async () => {
+    try {
+        await axios.post(
+            'http://localhost:5000/api/usage/sync', {}, config
+        )
+    } catch (err) {
+        console.log('Auto sync error:', err)
+    }
+}
+ const fetchData = async () => {
     try {
         // Current usage lo
         const usageRes = await axios.get(
@@ -37,7 +51,12 @@ const fetchData = async () => {
         )
         setUsage(usageRes.data.data || usageRes.data)
 
-        // Current bill lo
+        // Pehle sync karo — phir bill lo
+        await axios.post(
+            'http://localhost:5000/api/usage/sync', {}, config
+        )
+
+        // Bill lo
         const billRes = await axios.get(
             'http://localhost:5000/api/billing/current', config
         )
@@ -45,10 +64,9 @@ const fetchData = async () => {
 
     } catch (err) {
         console.log('Error:', err)
+        setBill({ storageCost: 0, apiCallsCost: 0, bandwidthCost: 0, totalCost: 0 })
     }
 
-    // Forecast alag try-catch mein — 
-    // taki baaki data show ho chahe forecast fail ho
     try {
         const forecastRes = await axios.get(
             'http://localhost:5000/api/billing/forecast', config
@@ -60,53 +78,79 @@ const fetchData = async () => {
 
     setLoading(false)
 }
+  // C++ engine mein data sync karo
+const handleSync = async () => {
+    try {
+        await axios.post(
+            'http://localhost:5000/api/usage/sync', {}, config
+        )
+        // Data sync hone ke baad refresh karo
+        fetchData()
+        alert('✅ Data synced!')
+    } catch (err) {
+        alert('❌ Sync failed!')
+    }
+}
 
   // Logout
   const handleLogout = () => {
-    localStorage.clear()
-    navigate('/login')
-  }
+    localStorage.clear();
+    navigate("/login");
+  };
+  useEffect(() => {
+    // Pehle sync karo — phir data fetch karo
+    const init = async () => {
+        await autoSync()  // C++ engine mein data load karo
+        await fetchData() // phir dashboard data lo
+    }
+    init()
+}, [])
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">Loading...</p>
       </div>
-    )
+    );
   }
 
   // Chart data
   const usageChartData = [
-    { name: 'Storage (GB)', value: usage?.storageGB   || 0 },
-    { name: 'API Calls (k)', value: (usage?.apiCalls  || 0) / 1000 },
-    { name: 'Bandwidth (GB)', value: usage?.bandwidthGB || 0 },
-  ]
+    { name: "Storage (GB)", value: usage?.storageGB || 0 },
+    { name: "API Calls (k)", value: (usage?.apiCalls || 0) / 1000 },
+    { name: "Bandwidth (GB)", value: usage?.bandwidthGB || 0 },
+  ];
   const billChartData = [
-    { name: 'Storage',   value: bill?.storageCost   || 0 },
-    { name: 'API Calls', value: bill?.apiCallsCost  || 0 },
-    { name: 'Bandwidth', value: bill?.bandwidthCost || 0 },
-  ]
+    { name: "Storage", value: bill?.storageCost || 0 },
+    { name: "API Calls", value: bill?.apiCallsCost || 0 },
+    { name: "Bandwidth", value: bill?.bandwidthCost || 0 },
+  ];
   return (
     <div className="min-h-screen bg-gray-100">
-
       {/* Navbar */}
       <nav className="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold">🚀 Billing Engine</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm">👤 {name} ({tenantId})</span>
+          <span className="text-sm">
+            👤 {name} ({tenantId})
+          </span>
           <button
             onClick={handleLogout}
             className="bg-white text-blue-600 px-3 py-1 rounded text-sm hover:bg-gray-100"
           >
             Logout
           </button>
+          <button
+            onClick={handleSync}
+            className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 mr-2"
+          >
+            🔄 Sync
+          </button>
         </div>
       </nav>
       <div className="max-w-6xl mx-auto p-6">
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          
           <div className="bg-white rounded-lg p-4 shadow">
             <p className="text-gray-500 text-sm">Storage Used</p>
             <p className="text-2xl font-bold text-blue-600">
@@ -186,44 +230,43 @@ const fetchData = async () => {
           </div>
         </div>
         {/* ML Forecast */}
-{forecast && (
-    <div className="bg-white rounded-lg p-6 shadow mt-6">
-        <h2 className="text-lg font-semibold mb-4">
-            🤖 Next Month Prediction (ML)
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            
-            <div className="bg-blue-50 rounded p-3 text-center">
+        {forecast && (
+          <div className="bg-white rounded-lg p-6 shadow mt-6">
+            <h2 className="text-lg font-semibold mb-4">
+              🤖 Next Month Prediction (ML)
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded p-3 text-center">
                 <p className="text-gray-500 text-sm">Storage</p>
                 <p className="text-xl font-bold text-blue-600">
-                    {forecast.storageGB} GB
+                  {forecast.storageGB} GB
                 </p>
-            </div>
+              </div>
 
-            <div className="bg-green-50 rounded p-3 text-center">
+              <div className="bg-green-50 rounded p-3 text-center">
                 <p className="text-gray-500 text-sm">API Calls</p>
                 <p className="text-xl font-bold text-green-600">
-                    {forecast.apiCalls?.toLocaleString()}
+                  {forecast.apiCalls?.toLocaleString()}
                 </p>
-            </div>
+              </div>
 
-            <div className="bg-purple-50 rounded p-3 text-center">
+              <div className="bg-purple-50 rounded p-3 text-center">
                 <p className="text-gray-500 text-sm">Bandwidth</p>
                 <p className="text-xl font-bold text-purple-600">
-                    {forecast.bandwidthGB} GB
+                  {forecast.bandwidthGB} GB
                 </p>
-            </div>
+              </div>
 
-            <div className="bg-red-50 rounded p-3 text-center">
+              <div className="bg-red-50 rounded p-3 text-center">
                 <p className="text-gray-500 text-sm">Est. Cost</p>
                 <p className="text-xl font-bold text-red-600">
-                    ${forecast.estimatedCost}
+                  ${forecast.estimatedCost}
                 </p>
+              </div>
             </div>
-        </div>
-    </div>
-)}
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }
