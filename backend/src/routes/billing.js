@@ -2,15 +2,12 @@
 // billing.js — Bill calculate karna
 // aur invoices manage karna
 // ─────────────────────────────────────
-
 const express  = require('express');
 const axios    = require('axios');
 const Invoice  = require('../models/Invoice');
 const Usage    = require('../models/Usage');
 const { protect } = require('../middleware/auth');
-
 const router   = express.Router();
-
 // ─────────────────────────────────────
 // Helper — Current billing month
 // ─────────────────────────────────────
@@ -32,7 +29,7 @@ router.get('/current', protect, async (req, res) => {
         const response = await axios.get(
             `${process.env.CPP_ENGINE_URL}/bill/${tenantId}`
         )
-        // ...
+        // 
     } catch (error) {
         if (error.response && error.response.status === 404) {
             const tenantId = req.user.tenantId  // ← catch mein bhi chahiye
@@ -59,13 +56,11 @@ router.post('/generate', protect, async (req, res) => {
     try {
         const tenantId     = req.user.tenantId;
         const billingMonth = getCurrentMonth();
-
         // Pehle check karo — invoice already bana hai?
         const existingInvoice = await Invoice.findOne({ 
             tenantId, 
             billingMonth 
         });
-        
         if (existingInvoice) {
             return res.json({
                 success: true,
@@ -73,7 +68,6 @@ router.post('/generate', protect, async (req, res) => {
                 data:    existingInvoice
             });
         }
-
         // MongoDB se usage lo
         const usage = await Usage.findOne({ tenantId, billingMonth });
         
@@ -82,7 +76,6 @@ router.post('/generate', protect, async (req, res) => {
                 error: 'Koi usage nahi mili is month ki' 
             });
         }
-
         // C++ engine se bill calculate karo
         const billResponse = await axios.get(
             `${process.env.CPP_ENGINE_URL}/bill/${tenantId}`
@@ -130,14 +123,13 @@ router.get('/invoices', protect, async (req, res) => {
             count:   invoices.length,
             data:    invoices
         });
-
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 // ─────────────────────────────────────
 // PATCH /api/billing/pay/:invoiceId
-// Invoice mark as paid
+// Invoice mark as paid...
 // ─────────────────────────────────────
 router.patch('/pay/:invoiceId', protect, async (req, res) => {
     try {
@@ -161,5 +153,49 @@ router.patch('/pay/:invoiceId', protect, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// ─────────────────────────────────────
+// GET /api/billing/forecast
+// ML engine se next month prediction lo
+// ─────────────────────────────────────
+router.get('/forecast', protect, async (req, res) => {
+    try {
+        const tenantId = req.user.tenantId;
 
+        // MongoDB se last 6 months ki history lo
+        const history = await Usage.find({ tenantId })
+            .sort({ billingMonth: 1 })  // purana pehle
+            .limit(6);
+
+        // Agar history nahi hai
+        if (history.length === 0) {
+            return res.json({
+                success: true,
+                message: 'History nahi hai — use record karo pehle',
+                predictions: null
+            });
+        }
+
+        // Arrays banao ML engine ke liye
+        const storageHistory   = history.map(h => h.storageGB);
+        const apiCallsHistory  = history.map(h => h.apiCalls);
+        const bandwidthHistory = history.map(h => h.bandwidthGB);
+
+        // ML engine ko call karo
+        const mlResponse = await axios.post('http://localhost:5001/predict', {
+            storageHistory,
+            apiCallsHistory,
+            bandwidthHistory
+        });
+
+        res.json({
+            success:     true,
+            history:     history,
+            predictions: mlResponse.data.predictions
+        });
+
+    } catch (error) {
+        console.log('Forecast error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
 module.exports = router;

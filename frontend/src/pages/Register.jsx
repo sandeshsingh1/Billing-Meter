@@ -4,42 +4,34 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
-
 export default function Register() {
   const [form,    setForm]    = useState({
     name: '', email: '', password: '', tenantId: ''
   })
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
-
+  
   const navigate = useNavigate()
-
   // Input change handler
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-
     try {
       const res = await axios.post('http://localhost:5000/api/auth/register', form)
-
       localStorage.setItem('token',    res.data.token)
       localStorage.setItem('tenantId', res.data.tenantId)
       localStorage.setItem('name',     res.data.name)
-
       navigate('/dashboard')
-
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed')
     } finally {
       setLoading(false)
     }
   }
-
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
@@ -54,9 +46,7 @@ export default function Register() {
             {error}
           </div>
         )}
-
         <form onSubmit={handleSubmit}>
-
           {/* Name */}
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-medium mb-1">Name</label>
@@ -69,7 +59,6 @@ export default function Register() {
               required
             />
           </div>
-
           {/* TenantId */}
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-medium mb-1">Tenant ID</label>
@@ -82,7 +71,6 @@ export default function Register() {
               required
             />
           </div>
-
           {/* Email */}
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-medium mb-1">Email</label>
@@ -96,7 +84,6 @@ export default function Register() {
               required
             />
           </div>
-
           {/* Password */}
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-medium mb-1">Password</label>

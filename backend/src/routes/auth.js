@@ -1,13 +1,11 @@
 // ─────────────────────────────────────
 // auth.js — Login aur Signup ke routes
 // ─────────────────────────────────────
-
 const express  = require('express');
 const jwt      = require('jsonwebtoken');
 const User     = require('../models/User');
 const { protect } = require('../middleware/auth');
 const router   = express.Router();
-
 // ─────────────────────────────────────
 // Helper — JWT Token banana
 // ─────────────────────────────────────
@@ -18,7 +16,6 @@ const generateToken = (id) => {
         { expiresIn: '30d' }
     );
 };
-
 // ─────────────────────────────────────
 // POST /api/auth/register
 // ─────────────────────────────────────
@@ -33,7 +30,6 @@ router.post('/register', async (req, res) => {
                 error: 'Email already registered hai'
             });
         }
-
         // TenantId already exist karta hai?
         const tenantExists = await User.findOne({ tenantId });
         if (tenantExists) {
@@ -41,7 +37,6 @@ router.post('/register', async (req, res) => {
                 error: 'TenantId already exist karta hai'
             });
         }
-
         // Naya user banao
         const user = await User.create({
             tenantId,
@@ -49,7 +44,6 @@ router.post('/register', async (req, res) => {
             email,
             password
         });
-
         res.status(201).json({
             success:  true,
             token:    generateToken(user._id),
@@ -58,13 +52,11 @@ router.post('/register', async (req, res) => {
             email:    user.email,
             role:     user.role
         });
-
     } catch (error) {
         console.log('ERROR:', error.stack);
         res.status(500).json({ error: error.message });
     }
 });
-
 // ─────────────────────────────────────
 // POST /api/auth/login
 // ─────────────────────────────────────
@@ -90,12 +82,10 @@ router.post('/login', async (req, res) => {
                 error: 'Email ya password galat hai'
             });
         }
-
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
-
 // ─────────────────────────────────────
 // GET /api/auth/me
 // Apni profile dekho
@@ -114,5 +104,4 @@ router.get('/me', protect, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-
 module.exports = router;

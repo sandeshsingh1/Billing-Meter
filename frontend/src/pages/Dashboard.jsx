@@ -9,12 +9,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
 } from 'recharts'
-
-export default function Dashboard() {
+export default function Dashboard(){
   const [usage,   setUsage]   = useState(null)
   const [bill,    setBill]    = useState(null)
   const [loading, setLoading] = useState(true)
-
+  const [forecast, setForecast] = useState(null)
   const navigate  = useNavigate()
   const token     = localStorage.getItem('token')
   const name      = localStorage.getItem('name')
@@ -30,26 +29,37 @@ export default function Dashboard() {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
+const fetchData = async () => {
     try {
-      // Current usage lo
-      const usageRes = await axios.get(
-        'http://localhost:5000/api/usage/current', config
-      )
-      setUsage(usageRes.data.data || usageRes.data)
+        // Current usage lo
+        const usageRes = await axios.get(
+            'http://localhost:5000/api/usage/current', config
+        )
+        setUsage(usageRes.data.data || usageRes.data)
 
-      // Current bill lo
-      const billRes = await axios.get(
-        'http://localhost:5000/api/billing/current', config
-      )
-      setBill(billRes.data.data)
+        // Current bill lo
+        const billRes = await axios.get(
+            'http://localhost:5000/api/billing/current', config
+        )
+        setBill(billRes.data.data)
 
     } catch (err) {
-      console.log('Error:', err)
-    } finally {
-      setLoading(false)
+        console.log('Error:', err)
     }
-  }
+
+    // Forecast alag try-catch mein — 
+    // taki baaki data show ho chahe forecast fail ho
+    try {
+        const forecastRes = await axios.get(
+            'http://localhost:5000/api/billing/forecast', config
+        )
+        setForecast(forecastRes.data.predictions)
+    } catch (err) {
+        console.log('Forecast error:', err)
+    }
+
+    setLoading(false)
+}
 
   // Logout
   const handleLogout = () => {
@@ -71,13 +81,11 @@ export default function Dashboard() {
     { name: 'API Calls (k)', value: (usage?.apiCalls  || 0) / 1000 },
     { name: 'Bandwidth (GB)', value: usage?.bandwidthGB || 0 },
   ]
-
   const billChartData = [
     { name: 'Storage',   value: bill?.storageCost   || 0 },
     { name: 'API Calls', value: bill?.apiCallsCost  || 0 },
     { name: 'Bandwidth', value: bill?.bandwidthCost || 0 },
   ]
-
   return (
     <div className="min-h-screen bg-gray-100">
 
@@ -94,7 +102,6 @@ export default function Dashboard() {
           </button>
         </div>
       </nav>
-
       <div className="max-w-6xl mx-auto p-6">
 
         {/* Stats Cards */}
@@ -106,21 +113,18 @@ export default function Dashboard() {
               {usage?.storageGB || 0} GB
             </p>
           </div>
-
           <div className="bg-white rounded-lg p-4 shadow">
             <p className="text-gray-500 text-sm">API Calls</p>
             <p className="text-2xl font-bold text-green-600">
               {(usage?.apiCalls || 0).toLocaleString()}
             </p>
           </div>
-
           <div className="bg-white rounded-lg p-4 shadow">
             <p className="text-gray-500 text-sm">Bandwidth</p>
             <p className="text-2xl font-bold text-purple-600">
               {usage?.bandwidthGB || 0} GB
             </p>
           </div>
-
           <div className="bg-white rounded-lg p-4 shadow">
             <p className="text-gray-500 text-sm">Total Bill</p>
             <p className="text-2xl font-bold text-red-600">
@@ -128,10 +132,8 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
-
         {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
           {/* Usage Chart */}
           <div className="bg-white rounded-lg p-4 shadow">
             <h2 className="text-lg font-semibold mb-4">📊 Usage Overview</h2>
@@ -145,7 +147,6 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-
           {/* Bill Chart */}
           <div className="bg-white rounded-lg p-4 shadow">
             <h2 className="text-lg font-semibold mb-4">💰 Cost Breakdown</h2>
@@ -160,7 +161,6 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-
         {/* Bill Summary */}
         <div className="bg-white rounded-lg p-6 shadow mt-6">
           <h2 className="text-lg font-semibold mb-4">🧾 Bill Summary</h2>
@@ -185,7 +185,44 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        {/* ML Forecast */}
+{forecast && (
+    <div className="bg-white rounded-lg p-6 shadow mt-6">
+        <h2 className="text-lg font-semibold mb-4">
+            🤖 Next Month Prediction (ML)
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            
+            <div className="bg-blue-50 rounded p-3 text-center">
+                <p className="text-gray-500 text-sm">Storage</p>
+                <p className="text-xl font-bold text-blue-600">
+                    {forecast.storageGB} GB
+                </p>
+            </div>
 
+            <div className="bg-green-50 rounded p-3 text-center">
+                <p className="text-gray-500 text-sm">API Calls</p>
+                <p className="text-xl font-bold text-green-600">
+                    {forecast.apiCalls?.toLocaleString()}
+                </p>
+            </div>
+
+            <div className="bg-purple-50 rounded p-3 text-center">
+                <p className="text-gray-500 text-sm">Bandwidth</p>
+                <p className="text-xl font-bold text-purple-600">
+                    {forecast.bandwidthGB} GB
+                </p>
+            </div>
+
+            <div className="bg-red-50 rounded p-3 text-center">
+                <p className="text-gray-500 text-sm">Est. Cost</p>
+                <p className="text-xl font-bold text-red-600">
+                    ${forecast.estimatedCost}
+                </p>
+            </div>
+        </div>
+    </div>
+)}
       </div>
     </div>
   )

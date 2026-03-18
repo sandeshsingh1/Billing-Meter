@@ -2,14 +2,11 @@
 // index.js — Main server file
 // Sab kuch yahan se start hota hai
 // ─────────────────────────────────────
-
 const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
 require('dotenv').config();
-
 const app = express();
-
 // ─────────────────────────────────────
 // MIDDLEWARE SETUP
 // ─────────────────────────────────────
@@ -30,7 +27,6 @@ app.get('/health', (req, res) => {
         message: 'Billing Engine API running' 
     });
 });
-
 // ─────────────────────────────────────
 // MongoDB se connect karo aur server start karo
 // ─────────────────────────────────────
@@ -46,7 +42,6 @@ mongoose.connect(process.env.MONGO_URI)
 process.on('unhandledRejection', (err) => {
     console.log('UNHANDLED REJECTION:', err.stack);
 });
-
 process.on('uncaughtException', (err) => {
     console.log('UNCAUGHT EXCEPTION:', err.stack);
 });

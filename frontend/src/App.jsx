@@ -18,7 +18,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <Dashboard />
+            <Dashboard/>
           </ProtectedRoute>
         } />
         {/* Default redirect */}
@@ -28,3 +28,6 @@ function App() {
   )
 }
 export default App
+
+
+

@@ -2,10 +2,8 @@
 // auth.js — JWT Token verify karna
 // Har protected route pe ye check hoga
 // ─────────────────────────────────────
-
 const jwt  = require('jsonwebtoken');
 const User = require('../models/User');
-
 // ─────────────────────────────────────
 // protect — middleware function
 // req  = request (aane wala data)
@@ -21,7 +19,6 @@ const protect = async (req, res, next) => {
         try {
             // "Bearer TOKEN" se sirf TOKEN nikalo
             token = req.headers.authorization.split(' ')[1];
-
             // Token verify karo
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
@@ -30,14 +27,12 @@ const protect = async (req, res, next) => {
 
             // Aage jao — next middleware ya route
             return next();
-
         } catch (error) {
             return res.status(401).json({
                 error: 'Token invalid hai, login karo'
             });
         }
     }
-
     // Token hai hi nahi
     if (!token) {
         return res.status(401).json({
@@ -45,5 +40,4 @@ const protect = async (req, res, next) => {
         });
     }
 };
-
 module.exports = { protect };
