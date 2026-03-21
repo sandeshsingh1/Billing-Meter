@@ -160,17 +160,14 @@ router.patch('/pay/:invoiceId', protect, async (req, res) => {
             { status: 'paid' },   // status paid karo
             { new: true }          // updated document return karo
         );
-
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice nahi mili' });
         }
-
         res.json({
             success: true,
             message: 'Invoice paid!',
             data:    invoice
         });
-
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -203,7 +200,7 @@ router.get('/forecast', protect, async (req, res) => {
         const bandwidthHistory = history.map(h => h.bandwidthGB);
 
         // ML engine ko call karo
-        const mlResponse = await axios.post('http://localhost:5001/predict', {
+        const mlResponse = await axios.post(`${process.env.ML_ENGINE_URL}/predict`, {
             storageHistory,
             apiCallsHistory,
             bandwidthHistory
