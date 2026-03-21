@@ -3,12 +3,10 @@
 # Linear Regression use karke agla 
 # mahina predict karta hai
 # ─────────────────────────────────────
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
 from sklearn.linear_model import LinearRegression
-
 app = Flask(__name__)
 CORS(app)  # React se requests allow karo
 
@@ -47,12 +45,11 @@ def predict_next(values):
 def predict():
     try:
         data = request.get_json()
-        
         # History arrays lo
         storage_history   = data.get('storageHistory',   [])
         api_calls_history = data.get('apiCallsHistory',  [])
         bandwidth_history = data.get('bandwidthHistory', [])
-        
+
         # Predict karo
         predicted_storage   = predict_next(storage_history)
         predicted_api_calls = predict_next(api_calls_history)
