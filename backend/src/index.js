@@ -4,13 +4,13 @@
 // ─────────────────────────────────────
 const express  = require('express');
 const mongoose = require('mongoose');
-const cors     = require('cors');
 require('dotenv').config();
 const app = express();
 // ─────────────────────────────────────
 // MIDDLEWARE SETUP
 // ─────────────────────────────────────
-app.use(cors());           // Frontend se requests allow karo
+const cors = require("cors");
+app.use(cors({ origin: "*" }));
 app.use(express.json());   // JSON body parse karo
 
 // ─────────────────────────────────────
@@ -30,7 +30,7 @@ app.get('/health', (req, res) => {
 // ─────────────────────────────────────
 // MongoDB se connect karo aur server start karo
 // ─────────────────────────────────────
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGODB_URI||5000)
     .then(() => {
         console.log('✅ MongoDB connected');
         app.listen(process.env.PORT, () => {
