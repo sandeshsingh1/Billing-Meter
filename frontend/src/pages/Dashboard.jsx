@@ -14,97 +14,152 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
 export default function Dashboard() {
   const [usage, setUsage] = useState(null);
   const [bill, setBill] = useState(null);
   const [loading, setLoading] = useState(true);
   const [forecast, setForecast] = useState(null);
+  const [files, setFiles] = useState([]);
   const navigate = useNavigate();
+
   const token = localStorage.getItem("token");
   const name = localStorage.getItem("name");
   const tenantId = localStorage.getItem("tenantId");
 
-  // Auth header
   const config = {
     headers: { Authorization: `Bearer ${token}` },
   };
 
-  // Data fetch karo
-// ─────────────────────────────────────
-// Auto sync — page load hone pe
-// C++ engine mein data sync karo
-// ─────────────────────────────────────
-const autoSync = async () => {
+  // ─────────────────────────────────────
+  // Fetch usage + bill + forecast
+  // ─────────────────────────────────────
+  const fetchData = async () => {
     try {
-        await axios.post(
-            'http://localhost:5000/api/usage/sync', {}, config
-        )
+      const usageRes = await axios.get(
+        "http://localhost:5000/api/usage/current",
+        config,
+      );
+      setUsage(usageRes.data.data || usageRes.data);
+
+      // ✅ Koi sync call nahi — seedha bill lo
+      const billRes = await axios.get(
+        "http://localhost:5000/api/billing/current",
+        config,
+      );
+      setBill(billRes.data.data);
     } catch (err) {
-        console.log('Auto sync error:', err)
-    }
-}
- const fetchData = async () => {
-    try {
-        // Current usage lo
-        const usageRes = await axios.get(
-            'http://localhost:5000/api/usage/current', config
-        )
-        setUsage(usageRes.data.data || usageRes.data)
-
-        // Pehle sync karo — phir bill lo
-        await axios.post(
-            'http://localhost:5000/api/usage/sync', {}, config
-        )
-
-        // Bill lo
-        const billRes = await axios.get(
-            'http://localhost:5000/api/billing/current', config
-        )
-        setBill(billRes.data.data)
-
-    } catch (err) {
-        console.log('Error:', err)
-        setBill({ storageCost: 0, apiCallsCost: 0, bandwidthCost: 0, totalCost: 0 })
+      console.log("Error:", err);
+      setBill({
+        storageCost: 0,
+        apiCallsCost: 0,
+        bandwidthCost: 0,
+        totalCost: 0,
+      });
     }
 
     try {
-        const forecastRes = await axios.get(
-            'http://localhost:5000/api/billing/forecast', config
-        )
-        setForecast(forecastRes.data.predictions)
+      const forecastRes = await axios.get(
+        "http://localhost:5000/api/billing/forecast",
+        config,
+      );
+      setForecast(forecastRes.data.predictions);
     } catch (err) {
-        console.log('Forecast error:', err)
+      console.log("Forecast error:", err);
     }
 
-    setLoading(false)
-}
-  // C++ engine mein data sync karo
-const handleSync = async () => {
+    setLoading(false);
+  };
+
+  // ─────────────────────────────────────
+  // Fetch files list
+  // ─────────────────────────────────────
+  const fetchFiles = async () => {
+    const res = await fetch("http://localhost:5000/api/objects", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    setFiles(data);
+  };
+
+  // ─────────────────────────────────────
+  // Upload — sync call NAHI karo
+  // ─────────────────────────────────────
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    await fetch("http://localhost:5000/api/objects/upload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    // ✅ Sync call nahi — bas UI refresh karo
+    await fetchFiles();
+    await fetchData();
+  };
+
+  // ─────────────────────────────────────
+  // Delete — fetchData bhi call karo
+  // ─────────────────────────────────────
+  const handleDelete = async (file) => {
+    await fetch(`http://localhost:5000/api/objects/${file}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    // ✅ Dono refresh karo
+    await fetchFiles();
+    await fetchData(); // storage minus hoga UI mein
+  };
+
+  // Manual sync button
+  const handleSync = async () => {
     try {
-        await axios.post(
-            'http://localhost:5000/api/usage/sync', {}, config
-        )
-        // Data sync hone ke baad refresh karo
-        fetchData()
-        alert('✅ Data synced!')
+      await axios.post("http://localhost:5000/api/usage/sync", {}, config);
+      await fetchData();
+      alert("✅ Data synced!");
     } catch (err) {
-        alert('❌ Sync failed!')
+      alert("❌ Sync failed!");
     }
-}
+  };
 
-  // Logout
   const handleLogout = () => {
     localStorage.clear();
     navigate("/login");
   };
+  const handleDownload = async (filename) => {
+    const res = await fetch(`http://localhost:5000/api/objects/${filename}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    // UI refresh
+    await fetchData();
+  };
+  // ─────────────────────────────────────
+  // Page load — sirf fetchData + fetchFiles
+  // ─────────────────────────────────────
   useEffect(() => {
-    // Pehle sync karo — phir data fetch karo
     const init = async () => {
-        await autoSync()  // C++ engine mein data load karo
-        await fetchData() // phir dashboard data lo
-    }
-    init()
-}, [])
+      await fetchData();
+      await fetchFiles();
+    };
+    init();
+  }, []);
 
   if (loading) {
     return (
@@ -125,6 +180,7 @@ const handleSync = async () => {
     { name: "API Calls", value: bill?.apiCallsCost || 0 },
     { name: "Bandwidth", value: bill?.bandwidthCost || 0 },
   ];
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Navbar */}
@@ -148,13 +204,14 @@ const handleSync = async () => {
           </button>
         </div>
       </nav>
+
       <div className="max-w-6xl mx-auto p-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg p-4 shadow">
             <p className="text-gray-500 text-sm">Storage Used</p>
             <p className="text-2xl font-bold text-blue-600">
-              {usage?.storageGB || 0} GB
+              {((usage?.storageGB || 0) * 1024).toFixed(2)} MB
             </p>
           </div>
           <div className="bg-white rounded-lg p-4 shadow">
@@ -166,19 +223,19 @@ const handleSync = async () => {
           <div className="bg-white rounded-lg p-4 shadow">
             <p className="text-gray-500 text-sm">Bandwidth</p>
             <p className="text-2xl font-bold text-purple-600">
-              {usage?.bandwidthGB || 0} GB
+              {(usage?.bandwidthGB || 0).toFixed(6)} GB
             </p>
           </div>
           <div className="bg-white rounded-lg p-4 shadow">
             <p className="text-gray-500 text-sm">Total Bill</p>
             <p className="text-2xl font-bold text-red-600">
-              ${bill?.totalCost || 0}
+              ${(bill?.totalCost || 0).toFixed(6)}
             </p>
           </div>
         </div>
+
         {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Usage Chart */}
           <div className="bg-white rounded-lg p-4 shadow">
             <h2 className="text-lg font-semibold mb-4">📊 Usage Overview</h2>
             <ResponsiveContainer width="100%" height={250}>
@@ -191,7 +248,6 @@ const handleSync = async () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          {/* Bill Chart */}
           <div className="bg-white rounded-lg p-4 shadow">
             <h2 className="text-lg font-semibold mb-4">💰 Cost Breakdown</h2>
             <ResponsiveContainer width="100%" height={250}>
@@ -205,30 +261,38 @@ const handleSync = async () => {
             </ResponsiveContainer>
           </div>
         </div>
+
         {/* Bill Summary */}
         <div className="bg-white rounded-lg p-6 shadow mt-6">
           <h2 className="text-lg font-semibold mb-4">🧾 Bill Summary</h2>
           <div className="space-y-2">
             <div className="flex justify-between border-b pb-2">
               <span className="text-gray-600">Storage Cost</span>
-              <span className="font-medium">${bill?.storageCost || 0}</span>
+              <span className="font-medium">
+                ${(bill?.storageCost || 0).toFixed(6)}
+              </span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-gray-600">API Calls Cost</span>
-              <span className="font-medium">${bill?.apiCallsCost || 0}</span>
+              <span className="font-medium">
+                ${(bill?.apiCallsCost || 0).toFixed(6)}
+              </span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-gray-600">Bandwidth Cost</span>
-              <span className="font-medium">${bill?.bandwidthCost || 0}</span>
+              <span className="font-medium">
+                ${(bill?.bandwidthCost || 0).toFixed(6)}
+              </span>
             </div>
             <div className="flex justify-between pt-2">
               <span className="font-bold text-lg">Total</span>
               <span className="font-bold text-lg text-red-600">
-                ${bill?.totalCost || 0} USD
+                ${(bill?.totalCost || 0).toFixed(6)} USD
               </span>
             </div>
           </div>
         </div>
+
         {/* ML Forecast */}
         {forecast && (
           <div className="bg-white rounded-lg p-6 shadow mt-6">
@@ -237,35 +301,66 @@ const handleSync = async () => {
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-blue-50 rounded p-3 text-center">
-                <p className="text-gray-500 text-sm">Storage</p>
-                <p className="text-xl font-bold text-blue-600">
-                  {forecast.storageGB} GB
-                </p>
+                <p>Storage</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {((usage?.storageGB || 0) * 1024).toFixed(6)} MB
+                </p>{" "}
               </div>
-
               <div className="bg-green-50 rounded p-3 text-center">
-                <p className="text-gray-500 text-sm">API Calls</p>
-                <p className="text-xl font-bold text-green-600">
-                  {forecast.apiCalls?.toLocaleString()}
-                </p>
+                <p>API Calls</p>
+                <p>{Math.round(forecast.apiCalls)}</p>
               </div>
-
               <div className="bg-purple-50 rounded p-3 text-center">
-                <p className="text-gray-500 text-sm">Bandwidth</p>
-                <p className="text-xl font-bold text-purple-600">
-                  {forecast.bandwidthGB} GB
-                </p>
+                <p>Bandwidth</p>
+                <p>{forecast.bandwidthGB.toFixed(6)} GB</p>
               </div>
-
               <div className="bg-red-50 rounded p-3 text-center">
-                <p className="text-gray-500 text-sm">Est. Cost</p>
-                <p className="text-xl font-bold text-red-600">
-                  ${forecast.estimatedCost}
-                </p>
+                <p>Est. Cost</p>
+                <p>${forecast.estimatedCost.toFixed(6)}</p>
               </div>
             </div>
           </div>
         )}
+
+        {/* Object Storage */}
+        <div className="bg-white rounded-lg p-6 shadow mt-6">
+          <h2 className="text-lg font-semibold mb-4">📂 Object Storage</h2>
+          <div className="mb-4">
+            <input
+              type="file"
+              onChange={handleUpload}
+              className="border p-2 rounded"
+            />
+          </div>
+          {files.length === 0 ? (
+            <p className="text-gray-500">No files uploaded</p>
+          ) : (
+            <ul className="space-y-2">
+              {files.map((file) => (
+                <li
+                  key={file}
+                  className="flex justify-between items-center border p-3 rounded"
+                >
+                  <span>{file}</span>
+                  <div className="space-x-2">
+                    <button
+                      onClick={() => handleDownload(file)}
+                      className="bg-blue-500 text-white px-3 py-1 rounded"
+                    >
+                      Download
+                    </button>
+                    <button
+                      onClick={() => handleDelete(file)}
+                      className="bg-red-500 text-white px-3 py-1 rounded"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

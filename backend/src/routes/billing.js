@@ -23,52 +23,40 @@ const getCurrentMonth = () => {
 // C++ engine se calculate hoga
 // ─────────────────────────────────────
 router.get('/current', protect, async (req, res) => {
-    try {
-        const tenantId = req.user.tenantId;
+  try {
+    const tenantId = req.user.tenantId;
+    const billingMonth = getCurrentMonth();
 
-        // Pehle C++ engine mein usage sync karo
-        const billingMonth = getCurrentMonth();
-        const usage = await Usage.findOne({ tenantId, billingMonth });
+    const usage = await Usage.findOne({ tenantId, billingMonth });
 
-        if (!usage) {
-            return res.json({
-                success: true,
-                data: {
-                    tenantId,
-                    storageCost:   0,
-                    apiCallsCost:  0,
-                    bandwidthCost: 0,
-                    totalCost:     0,
-                    currency:      'USD'
-                }
-            });
-        }
-
-        // C++ engine mein sync karo
-        try {
-            await axios.post(`${process.env.CPP_ENGINE_URL}/usage`, {
-                tenantId,
-                storageGB:   usage.storageGB,
-                apiCalls:    usage.apiCalls,
-                bandwidthGB: usage.bandwidthGB
-            });
-        } catch (syncErr) {
-            console.log('Sync error:', syncErr.message);
-        }
-
-        // Bill calculate karo
-        const response = await axios.get(
-            `${process.env.CPP_ENGINE_URL}/bill/${tenantId}`
-        );
-
-        res.json({
-            success: true,
-            data:    response.data
-        });
-
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    if (!usage) {
+      return res.json({
+        success: true,
+        data: { storageCost: 0, apiCallsCost: 0, bandwidthCost: 0, totalCost: 0 }
+      });
     }
+
+    // ✅ C++ ko POST mat karo — Node.js mein hi calculate karo
+    const storageCost   = usage.storageGB * 0.023;
+    const apiCallsCost  = (usage.apiCalls / 10000) * 0.004;
+    const bandwidthCost = usage.bandwidthGB * 0.09;
+    const totalCost     = storageCost + apiCallsCost + bandwidthCost;
+
+    res.json({
+      success: true,
+      data: {
+        tenantId,
+        storageCost:   parseFloat(storageCost.toFixed(4)),
+        apiCallsCost:  parseFloat(apiCallsCost.toFixed(4)),
+        bandwidthCost: parseFloat(bandwidthCost.toFixed(4)),
+        totalCost:     parseFloat(totalCost.toFixed(4)),
+        currency: 'USD'
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 // ─────────────────────────────────────
 // POST /api/billing/generate
