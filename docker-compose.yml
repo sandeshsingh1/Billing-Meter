@@ -29,7 +29,7 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - MONGO_URI=mongodb://mongodb:27017/billing_engine
+      - MONGODB_URI=mongodb://mongodb:27017/billing-engine
       - JWT_SECRET=your_super_secret_key_here
       - CPP_ENGINE_URL=http://cpp-engine:8080
       - ML_ENGINE_URL=http://ml-engine:5001
@@ -46,6 +46,18 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+  # ✅ MinIO (ADD THIS PART)
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    command: server /data --console-address ":9001"
 
 volumes:
   mongo_data:

@@ -6,20 +6,17 @@ RUN apt-get update && apt-get install -y \
     nlohmann-json3-dev \
     libssl-dev \
     libasio-dev \
-    git curl \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Crow header copy karo sahi jagah
-RUN git clone https://github.com/CrowCpp/Crow.git /crow && \
-    cp /crow/include/crow.h /usr/local/include/ && \
-    cp -r /crow/include/crow /usr/local/include/
+# ✅ Git clone ki jagah curl se seedha download karo
+RUN curl -L https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow-v1.0+5.deb -o crow.deb \
+    && dpkg -i crow.deb \
+    && rm crow.deb
 
 WORKDIR /app
-
 COPY . .
-
 RUN rm -rf build && mkdir build && cd build && cmake .. && make -j4
 
 EXPOSE 8080
-
 CMD ["./build/billing_engine"]

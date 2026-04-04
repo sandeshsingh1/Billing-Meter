@@ -1,133 +1,139 @@
 const express = require("express");
-const fs = require("fs");
 const multer = require("multer");
 const { protect } = require("../middleware/auth");
 const Usage = require("../models/Usage");
+const { internalClient, externalClient, ensureBucket } = require("../config/minio");
 
 const router = express.Router();
 
-// ─────────────────────────────────────
-// Helper — Current billing month
-// ─────────────────────────────────────
+// ✅ multer memory storage
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Helper — billing month
 const getCurrentMonth = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 };
 
-// 📂 Storage config (tenant-wise folder)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = `storage/${req.user.tenantId}`;
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  },
-});
-
-const upload = multer({ storage });
-
-
 // ================== ✅ UPLOAD ==================
 router.post("/upload", protect, upload.single("file"), async (req, res) => {
   try {
-    const fileSizeGB = req.file.size / (1024 * 1024 * 1024);
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const file = req.file;
     const tenantId = req.user.tenantId;
+    const fileName = Date.now() + "-" + file.originalname;
 
-    console.log("Uploading for tenant:", tenantId); // ← ADD
-    console.log("File size GB:", fileSizeGB);        // ← ADD
+    await ensureBucket(tenantId);
 
-    const result = await Usage.findOneAndUpdate(
-      { tenantId, billingMonth: getCurrentMonth() },
-      { $inc: { storageGB: fileSizeGB, apiCalls: 1, bandwidthGB: 0 } },
-      { upsert: true, returnDocument: 'after' }
+    // 🔹 Upload to MinIO
+    await internalClient.putObject(
+      tenantId,
+      fileName,
+      file.buffer
     );
 
-    console.log("MongoDB result:", result);          // ← ADD
+    // 🔹 Billing update
+    const fileSizeGB = file.size / (1024 * 1024 * 1024);
+
+    await Usage.findOneAndUpdate(
+      { tenantId, billingMonth: getCurrentMonth() },
+      { $inc: { storageGB: fileSizeGB, apiCalls: 1, bandwidthGB: 0 } },
+      { upsert: true }
+    );
 
     res.json({
       message: "File uploaded successfully",
-      file: req.file.filename,
+      file: fileName,
     });
+
   } catch (err) {
-    console.log("Upload error:", err.message);       // ← ADD
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // ================== 📃 LIST FILES ==================
-router.get("/", protect, (req, res) => {
+router.get("/", protect, async (req, res) => {
   try {
-    const dir = `storage/${req.user.tenantId}`;
+    const tenantId = req.user.tenantId;
+    const files = [];
 
-    if (!fs.existsSync(dir)) {
-      return res.json([]);
-    }
+    const stream = internalClient.listObjects(tenantId, "", true);
 
-    const files = fs.readdirSync(dir);
-    res.json(files);
+    stream.on("data", obj => files.push(obj.name));
+    stream.on("end", () => res.json(files));
+    stream.on("error", err => res.status(500).json({ error: err.message }));
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // ================== 📥 DOWNLOAD ==================
-router.get("/:filename", protect, async (req, res) => {
+router.get("/download/:fileName", protect, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
-    const filePath = `storage/${tenantId}/${req.params.filename}`;
+    const { fileName } = req.params;
 
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: "File not found" });
-    }
+    const stream = await internalClient.getObject(tenantId, fileName);
 
-    const stats = fs.statSync(filePath);
-    const fileSizeGB = stats.size / (1024 * 1024 * 1024);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    stream.pipe(res);
 
-    // ✅ Sirf MongoDB update karo
-    await Usage.findOneAndUpdate(
-      { tenantId, billingMonth: getCurrentMonth() },
-      { $inc: { storageGB: 0, apiCalls: 1, bandwidthGB: fileSizeGB } },
-      { upsert: true, returnDocument: "after" }
-    );
-
-    res.download(filePath);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // ================== ❌ DELETE ==================
-router.delete("/:filename", protect, async (req, res) => {
+router.delete("/:fileName", protect, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
-    const filePath = `storage/${tenantId}/${req.params.filename}`;
+    const { fileName } = req.params;
 
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: "File not found" });
-    }
+    const stat = await internalClient.statObject(tenantId, fileName);
+    const fileSizeGB = stat.size / (1024 * 1024 * 1024);
 
-    const stats = fs.statSync(filePath);
-    const fileSizeGB = stats.size / (1024 * 1024 * 1024);
+    await internalClient.removeObject(tenantId, fileName);
 
-    fs.unlinkSync(filePath);
-
-    // ✅ MongoDB mein storage minus karo
+    // 🔹 Billing update
     await Usage.findOneAndUpdate(
       { tenantId, billingMonth: getCurrentMonth() },
-      { $inc: { storageGB: -fileSizeGB, apiCalls: 1, bandwidthGB: 0 } },
-      { upsert: true, returnDocument: "after" }
+      { $inc: { storageGB: -fileSizeGB, apiCalls: 1 } },
+      { upsert: true }
     );
 
-    res.json({ message: "File deleted successfully" });
+    res.json({ message: "Deleted successfully" });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// ================== 🔗 PRESIGNED URL ==================
+router.get("/presigned/:fileName", protect, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { fileName } = req.params;
+
+    await ensureBucket(tenantId);
+
+  const url = await minioClient.presignedGetObject(
+  tenantId,
+  fileName,
+  60 * 60
+);
+
+// 🔥 ONLY replace host (safe way)
+const publicUrl = url.replace("http://minio:9000", "http://localhost:9000");
+
+res.json({ url: publicUrl });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

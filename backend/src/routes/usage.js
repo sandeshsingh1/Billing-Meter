@@ -77,10 +77,8 @@ router.get('/current', protect, async (req, res) => {
     try {
         const tenantId     = req.user.tenantId;
         const billingMonth = getCurrentMonth();
-
         // MongoDB se current month ki usage lo
         const usage = await Usage.findOne({ tenantId, billingMonth });
-
         if (!usage) {
             // Koi usage nahi hai abhi tak
             return res.json({
@@ -151,7 +149,6 @@ router.get('/realtime', protect, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
     });
-
     // ─────────────────────────────────────
 // POST /api/usage/sync
 // MongoDB se C++ engine mein data load karo

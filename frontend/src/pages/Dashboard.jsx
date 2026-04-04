@@ -14,7 +14,6 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
 export default function Dashboard() {
   const [usage, setUsage] = useState(null);
   const [bill, setBill] = useState(null);
@@ -133,23 +132,28 @@ export default function Dashboard() {
     navigate("/login");
   };
   const handleDownload = async (filename) => {
-    const res = await fetch(`http://localhost:5000/api/objects/${filename}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/objects/presigned/${filename}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const data = await res.json();
 
-    // UI refresh
+    // 🔥 Direct MinIO URL open
+    window.open(data.url, "_blank");
+
+    // Optional billing refresh
     await fetchData();
-  };
+
+  } catch (err) {
+    console.log("Download error:", err);
+  }
+};
   // ─────────────────────────────────────
   // Page load — sirf fetchData + fetchFiles
   // ─────────────────────────────────────
