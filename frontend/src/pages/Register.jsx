@@ -1,30 +1,33 @@
-// ─────────────────────────────────────
-// Register Page
-// ─────────────────────────────────────
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
+import { apiUrl } from '../lib/api'
+
 export default function Register() {
-  const [form,    setForm]    = useState({
-    name: '', email: '', password: '', tenantId: ''
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    tenantId: ''
   })
-  const [error,   setError]   = useState('')
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  
   const navigate = useNavigate()
-  // Input change handler
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/register', form)
-      localStorage.setItem('token',    res.data.token)
+      const res = await axios.post(apiUrl('/api/auth/register'), form)
+      localStorage.setItem('token', res.data.token)
       localStorage.setItem('tenantId', res.data.tenantId)
-      localStorage.setItem('name',     res.data.name)
+      localStorage.setItem('name', res.data.name)
       navigate('/dashboard')
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed')
@@ -32,12 +35,12 @@ export default function Register() {
       setLoading(false)
     }
   }
+
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-
         <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-          🚀 Billing Engine
+          Billing Engine
         </h1>
         <p className="text-center text-gray-500 mb-6">Create your account</p>
 
@@ -46,8 +49,8 @@ export default function Register() {
             {error}
           </div>
         )}
+
         <form onSubmit={handleSubmit}>
-          {/* Name */}
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-medium mb-1">Name</label>
             <input
@@ -59,7 +62,7 @@ export default function Register() {
               required
             />
           </div>
-          {/* TenantId */}
+
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-medium mb-1">Tenant ID</label>
             <input
@@ -71,7 +74,7 @@ export default function Register() {
               required
             />
           </div>
-          {/* Email */}
+
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-medium mb-1">Email</label>
             <input
@@ -84,7 +87,7 @@ export default function Register() {
               required
             />
           </div>
-          {/* Password */}
+
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-medium mb-1">Password</label>
             <input
@@ -93,7 +96,7 @@ export default function Register() {
               value={form.password}
               onChange={handleChange}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
-              placeholder="••••••"
+              placeholder="******"
               required
             />
           </div>

@@ -1,7 +1,3 @@
-// ─────────────────────────────────────
-// Dashboard Page
-// Usage charts aur bill dikhata hai
-// ─────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -14,6 +10,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { apiUrl } from "../lib/api";
+
 export default function Dashboard() {
   const [usage, setUsage] = useState(null);
   const [bill, setBill] = useState(null);
@@ -30,22 +28,12 @@ export default function Dashboard() {
     headers: { Authorization: `Bearer ${token}` },
   };
 
-  // ─────────────────────────────────────
-  // Fetch usage + bill + forecast
-  // ─────────────────────────────────────
   const fetchData = async () => {
     try {
-      const usageRes = await axios.get(
-        "http://localhost:5000/api/usage/current",
-        config,
-      );
+      const usageRes = await axios.get(apiUrl("/api/usage/current"), config);
       setUsage(usageRes.data.data || usageRes.data);
 
-      // ✅ Koi sync call nahi — seedha bill lo
-      const billRes = await axios.get(
-        "http://localhost:5000/api/billing/current",
-        config,
-      );
+      const billRes = await axios.get(apiUrl("/api/billing/current"), config);
       setBill(billRes.data.data);
     } catch (err) {
       console.log("Error:", err);
@@ -58,10 +46,7 @@ export default function Dashboard() {
     }
 
     try {
-      const forecastRes = await axios.get(
-        "http://localhost:5000/api/billing/forecast",
-        config,
-      );
+      const forecastRes = await axios.get(apiUrl("/api/billing/forecast"), config);
       setForecast(forecastRes.data.predictions);
     } catch (err) {
       console.log("Forecast error:", err);
@@ -70,20 +55,14 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  // ─────────────────────────────────────
-  // Fetch files list
-  // ─────────────────────────────────────
   const fetchFiles = async () => {
-    const res = await fetch("http://localhost:5000/api/objects", {
+    const res = await fetch(apiUrl("/api/objects"), {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
     setFiles(data);
   };
 
-  // ─────────────────────────────────────
-  // Upload — sync call NAHI karo
-  // ─────────────────────────────────────
   const handleUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -91,39 +70,33 @@ export default function Dashboard() {
     const formData = new FormData();
     formData.append("file", file);
 
-    await fetch("http://localhost:5000/api/objects/upload", {
+    await fetch(apiUrl("/api/objects/upload"), {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
 
-    // ✅ Sync call nahi — bas UI refresh karo
     await fetchFiles();
     await fetchData();
   };
 
-  // ─────────────────────────────────────
-  // Delete — fetchData bhi call karo
-  // ─────────────────────────────────────
   const handleDelete = async (file) => {
-    await fetch(`http://localhost:5000/api/objects/${file}`, {
+    await fetch(apiUrl(`/api/objects/${file}`), {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    // ✅ Dono refresh karo
     await fetchFiles();
-    await fetchData(); // storage minus hoga UI mein
+    await fetchData();
   };
 
-  // Manual sync button
   const handleSync = async () => {
     try {
-      await axios.post("http://localhost:5000/api/usage/sync", {}, config);
+      await axios.post(apiUrl("/api/usage/sync"), {}, config);
       await fetchData();
-      alert("✅ Data synced!");
+      alert("Data synced!");
     } catch (err) {
-      alert("❌ Sync failed!");
+      alert("Sync failed!");
     }
   };
 
@@ -131,32 +104,23 @@ export default function Dashboard() {
     localStorage.clear();
     navigate("/login");
   };
+
   const handleDownload = async (filename) => {
-  try {
-    const res = await fetch(
-      `http://localhost:5000/api/objects/presigned/${filename}`,
-      {
+    try {
+      const res = await fetch(apiUrl(`/api/objects/presigned/${filename}`), {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
-    );
+      });
 
-    const data = await res.json();
+      const data = await res.json();
+      window.open(data.url, "_blank");
+      await fetchData();
+    } catch (err) {
+      console.log("Download error:", err);
+    }
+  };
 
-    // 🔥 Direct MinIO URL open
-    window.open(data.url, "_blank");
-
-    // Optional billing refresh
-    await fetchData();
-
-  } catch (err) {
-    console.log("Download error:", err);
-  }
-};
-  // ─────────────────────────────────────
-  // Page load — sirf fetchData + fetchFiles
-  // ─────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       await fetchData();
@@ -173,7 +137,6 @@ export default function Dashboard() {
     );
   }
 
-  // Chart data
   const usageChartData = [
     { name: "Storage (GB)", value: usage?.storageGB || 0 },
     { name: "API Calls (k)", value: (usage?.apiCalls || 0) / 1000 },
@@ -187,12 +150,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Navbar */}
       <nav className="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">🚀 Billing Engine</h1>
+        <h1 className="text-xl font-bold">Billing Engine</h1>
         <div className="flex items-center gap-4">
           <span className="text-sm">
-            👤 {name} ({tenantId})
+            {name} ({tenantId})
           </span>
           <button
             onClick={handleLogout}
@@ -204,13 +166,12 @@ export default function Dashboard() {
             onClick={handleSync}
             className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 mr-2"
           >
-            🔄 Sync
+            Sync
           </button>
         </div>
       </nav>
 
       <div className="max-w-6xl mx-auto p-6">
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg p-4 shadow">
             <p className="text-gray-500 text-sm">Storage Used</p>
@@ -238,10 +199,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-lg p-4 shadow">
-            <h2 className="text-lg font-semibold mb-4">📊 Usage Overview</h2>
+            <h2 className="text-lg font-semibold mb-4">Usage Overview</h2>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={usageChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -253,7 +213,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
           <div className="bg-white rounded-lg p-4 shadow">
-            <h2 className="text-lg font-semibold mb-4">💰 Cost Breakdown</h2>
+            <h2 className="text-lg font-semibold mb-4">Cost Breakdown</h2>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={billChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -266,9 +226,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Bill Summary */}
         <div className="bg-white rounded-lg p-6 shadow mt-6">
-          <h2 className="text-lg font-semibold mb-4">🧾 Bill Summary</h2>
+          <h2 className="text-lg font-semibold mb-4">Bill Summary</h2>
           <div className="space-y-2">
             <div className="flex justify-between border-b pb-2">
               <span className="text-gray-600">Storage Cost</span>
@@ -297,18 +256,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ML Forecast */}
         {forecast && (
           <div className="bg-white rounded-lg p-6 shadow mt-6">
-            <h2 className="text-lg font-semibold mb-4">
-              🤖 Next Month Prediction (ML)
-            </h2>
+            <h2 className="text-lg font-semibold mb-4">Next Month Prediction (ML)</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-blue-50 rounded p-3 text-center">
                 <p>Storage</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {((usage?.storageGB || 0) * 1024).toFixed(6)} MB
-                </p>{" "}
+                </p>
               </div>
               <div className="bg-green-50 rounded p-3 text-center">
                 <p>API Calls</p>
@@ -326,9 +282,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Object Storage */}
         <div className="bg-white rounded-lg p-6 shadow mt-6">
-          <h2 className="text-lg font-semibold mb-4">📂 Object Storage</h2>
+          <h2 className="text-lg font-semibold mb-4">Object Storage</h2>
           <div className="mb-4">
             <input
               type="file"

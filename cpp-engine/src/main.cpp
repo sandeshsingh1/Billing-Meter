@@ -1,5 +1,6 @@
 #include "crow.h"
 #include "server.cpp"
+#include <cstdlib>
 #include <iostream>
 
 int main() {
@@ -7,8 +8,13 @@ int main() {
 
     setupRoutes(app);
 
-    std::cout << "🚀 C++ Metering Engine running on port 8080" << std::endl;
-    app.port(8080).multithreaded().run();
+    int port = 8080;
+    if (const char* envPort = std::getenv("PORT")) {
+        port = std::atoi(envPort);
+    }
+
+    std::cout << "C++ Metering Engine running on port " << port << std::endl;
+    app.port(port).multithreaded().run();
 
     return 0;
 }

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: billing-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+
+  - type: web
+    name: billing-ml-engine
+    runtime: docker
+    rootDir: ml-engine
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+
+  - type: web
+    name: billing-cpp-engine
+    runtime: docker
+    rootDir: cpp-engine
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health

@@ -1,43 +1,54 @@
-// ─────────────────────────────────────
-// index.js — Main server file
-// Sab kuch yahan se start hota hai
-// ─────────────────────────────────────
-const express  = require('express');
-const mongoose = require('mongoose');
-require('dotenv').config();
-const app = express();
-const objectRoutes = require("./routes/object");// ─────────────────────────────────────
-// MIDDLEWARE SETUP
-// ─────────────────────────────────────
+const express = require("express");
+const mongoose = require("mongoose");
 const cors = require("cors");
-app.use(cors({ origin: "*" }));
-app.use(express.json());   // JSON body parse karo
 
-// ─────────────────────────────────────
-// ROUTES
-// ─────────────────────────────────────
-app.use('/api/auth',    require('./routes/auth'));
-app.use('/api/usage',   require('./routes/usage'));
-app.use('/api/billing', require('./routes/billing'));
+require("dotenv").config();
+
+const app = express();
+const objectRoutes = require("./routes/object");
+const port = Number(process.env.PORT) || 5000;
+const allowedOrigins = (process.env.CORS_ORIGIN || "*")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+  })
+);
+app.use(express.json());
+
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/usage", require("./routes/usage"));
+app.use("/api/billing", require("./routes/billing"));
 app.use("/api/objects", objectRoutes);
-// Health check — server chal raha hai ya nahi
-app.get('/health', (req, res) => {
-    res.json({ 
-        status:  'OK', 
-        message: 'Billing Engine API running' 
-    });
+
+app.get("/health", (req, res) => {
+  res.json({
+    status: "OK",
+    message: "Billing Engine API running",
+  });
 });
-// ─────────────────────────────────────
-// MongoDB se connect karo aur server start karo
-// ─────────────────────────────────────
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
-        console.log('✅ MongoDB connected');
-        console.log('DB Name:', mongoose.connection.db.databaseName); // ← ADD
-        console.log('Host:', mongoose.connection.host);                // ← ADD
-        app.listen(process.env.PORT, () => {
-            console.log(`✅ Server running on port ${process.env.PORT}`);
-        });
-    })
 
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log("MongoDB connected");
+    console.log("DB Name:", mongoose.connection.db.databaseName);
+    console.log("Host:", mongoose.connection.host);
 
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
+  })
+  .catch((error) => {
+    console.error("MongoDB connection failed:", error.message);
+    process.exit(1);
+  });
