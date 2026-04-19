@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [forecast, setForecast] = useState(null);
   const [files, setFiles] = useState([]);
+  const [storageError, setStorageError] = useState("");
   const navigate = useNavigate();
 
   const token = localStorage.getItem("token");
@@ -56,11 +57,23 @@ export default function Dashboard() {
   };
 
   const fetchFiles = async () => {
-    const res = await fetch(apiUrl("/api/objects"), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    setFiles(data);
+    try {
+      const res = await fetch(apiUrl("/api/objects"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Object storage is unavailable");
+      }
+
+      setFiles(Array.isArray(data) ? data : []);
+      setStorageError("");
+    } catch (err) {
+      console.log("Object storage error:", err);
+      setFiles([]);
+      setStorageError("Object storage is not configured on production yet.");
+    }
   };
 
   const handleUpload = async (e) => {
@@ -70,24 +83,44 @@ export default function Dashboard() {
     const formData = new FormData();
     formData.append("file", file);
 
-    await fetch(apiUrl("/api/objects/upload"), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
+    try {
+      const res = await fetch(apiUrl("/api/objects/upload"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
 
-    await fetchFiles();
-    await fetchData();
+      if (!res.ok) {
+        throw new Error(data.error || "Upload failed");
+      }
+
+      await fetchFiles();
+      await fetchData();
+    } catch (err) {
+      console.log("Upload error:", err);
+      alert("Upload failed because object storage is not configured yet.");
+    }
   };
 
   const handleDelete = async (file) => {
-    await fetch(apiUrl(`/api/objects/${file}`), {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    try {
+      const res = await fetch(apiUrl(`/api/objects/${file}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
 
-    await fetchFiles();
-    await fetchData();
+      if (!res.ok) {
+        throw new Error(data.error || "Delete failed");
+      }
+
+      await fetchFiles();
+      await fetchData();
+    } catch (err) {
+      console.log("Delete error:", err);
+      alert("Delete failed because object storage is not configured yet.");
+    }
   };
 
   const handleSync = async () => {
@@ -114,10 +147,16 @@ export default function Dashboard() {
       });
 
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Download failed");
+      }
+
       window.open(data.url, "_blank");
       await fetchData();
     } catch (err) {
       console.log("Download error:", err);
+      alert("Download failed because object storage is not configured yet.");
     }
   };
 
@@ -284,6 +323,11 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-lg p-6 shadow mt-6">
           <h2 className="text-lg font-semibold mb-4">Object Storage</h2>
+          {storageError && (
+            <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {storageError}
+            </div>
+          )}
           <div className="mb-4">
             <input
               type="file"
